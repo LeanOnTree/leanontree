@@ -1,0 +1,48 @@
+# Jekyll site
+# Package your Jekyll site using the jekyll/builder Docker container image.
+# Add steps that build, test, save build artifacts, deploy, and more:
+# https://aka.ms/yaml
+
+# https://docs.microsoft.com/azure/devops/pipelines/languages/ruby
+pool:
+  vmImage: 'vs2017-win2016' # other options: 'macOS-10.13', 'vs2017-win2016'
+
+name: $(BuildDefinitionName)_$(Year:yy).$(Month).$(DayOfMonth)$(Rev:.r)
+
+steps:
+   
+- script: 
+    gem install bundler  
+  displayName: 'Install bundler'
+
+- script: 
+    bundle install --retry=3 --jobs=4
+  displayName: 'bundle install'
+#- script: |
+#    sass --update assets/stylesheets/sass:assets/stylesheets/css --style compressed 
+#  displayName: 'Jekyll build'
+  
+- script:
+    bundle exec jekyll build --destination $(Build.ArtifactStagingDirectory)  
+  displayName: 'Jekyll build'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline' # Optional. Options: filePath, inline
+    #filePath: # Required when targetType == FilePath
+    #arguments: # Optional
+    script: find . \( -iname '*.html' -o -iname '*.css' -o -iname '*.js' \) -exec gzip -9 -n {} \; -exec mv {}.gz {} \;
+    workingDirectory: $(Build.ArtifactStagingDirectory)
+  displayName: 'Encoding files with gzip'
+    #failOnStderr: false # Optional
+# Publish Build Artifacts
+# Publish build artifacts to Azure Artifacts/TFS or a file share
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathtoPublish: '$(Build.ArtifactStagingDirectory)' 
+    artifactName: 'webDeploy' 
+    publishLocation: 'container' # Options: container, filePath
+    #targetPath: # Required when publishLocation == FilePath
+    parallel: true # Optional
+    #parallelCount: # Optional
+  displayName: 'Publish Artifacts'
